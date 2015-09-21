@@ -14,7 +14,7 @@ if __name__ == '__main__':
         author=__author__,
         author_email="viruzzz.soft@gmail.com",
         license='ISC',
-        url="http://github.com/hitsl/bouser",
+        url="http://github.com/hitsl/bouser_ezekiel",
         packages=["bouser_ezekiel", ],
         zip_safe=False,
         package_data={},
