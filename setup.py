@@ -18,7 +18,10 @@ if __name__ == '__main__':
         packages=["bouser_ezekiel", ],
         zip_safe=False,
         package_data={},
-        install_requires=['bouser', ],
+        install_requires=[
+            'bouser',
+            'autobahn',
+        ],
         classifiers=[
             "Development Status :: 3 - Alpha",
             "Environment :: Plugins",

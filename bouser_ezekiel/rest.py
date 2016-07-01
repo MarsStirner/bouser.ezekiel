@@ -66,10 +66,6 @@ class EzekielRestResource(Resource, BouserPlugin):
     def release_lock(self, object_id, token):
         return self.service.release_lock(object_id, token)
 
-    @web.on
-    def boot_web(self, web):
-        web.root_resource.putChild('ezekiel', self)
-
 
 def make(config):
     return EzekielRestResource()

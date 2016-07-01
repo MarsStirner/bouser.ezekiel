@@ -7,13 +7,18 @@ import time
 from twisted.application.service import Service
 from twisted.python import log
 from zope.interface import implementer
+import blinker
 
 from bouser.helpers.plugin_helpers import BouserPlugin, Dependency
-from bouser.excs import LockNotFound, SerializableBaseException
+from bouser.excs import SerializableBaseException
 from .interfaces import ILockService, ITmpLockService
 
 __author__ = 'viruzzz-kun'
 __created__ = '13.09.2014'
+
+
+ezekiel_lock_acquired = blinker.signal('bouser.ezekiel:lock.acquired')
+ezekiel_lock_released = blinker.signal('bouser.ezekiel:lock.released')
 
 
 class Lock(object):
@@ -38,12 +43,13 @@ class Lock(object):
 
 
 class LockAlreadyAcquired(SerializableBaseException):
-    __slots__ = ['object_id', 'acquire_time', 'locker']
+    __slots__ = ['object_id', 'acquire_time', 'locker', 'message']
 
     def __init__(self, lock):
         self.object_id = lock.object_id
         self.acquire_time = lock.acquire_time
         self.locker = lock.locker
+        self.message = u'Object "%s" already locked by %s' % (lock.object_id, lock.locker)
 
     def __json__(self):
         return {
@@ -51,6 +57,24 @@ class LockAlreadyAcquired(SerializableBaseException):
             'object_id': self.object_id,
             'acquire': self.acquire_time,
             'locker': self.locker,
+            'exception': self.__class__.__name__,
+            'message': self.message,
+        }
+
+
+class LockNotFound(SerializableBaseException):
+    __slots__ = ['object_id', 'message']
+
+    def __init__(self, object_id):
+        self.object_id = object_id
+        self.message = 'Lock not found for object "%s"' % object_id
+
+    def __json__(self):
+        return {
+            'success': False,
+            'object_id': self.object_id,
+            'exception': self.__class__.__name__,
+            'message': self.message,
         }
 
 
@@ -101,7 +125,7 @@ class EzekielService(Service, BouserPlugin):
         if acquired_lock is not None:
             if short and acquired_lock[0].locker == locker:
                 return self.prolong_tmp_lock(object_id, acquired_lock[0].token)
-            return LockAlreadyAcquired(self.__locks[object_id][0])
+            raise LockAlreadyAcquired(self.__locks[object_id][0])
         t = time.time()
         token = uuid.uuid4().bytes
         if short:
@@ -115,6 +139,7 @@ class EzekielService(Service, BouserPlugin):
         self.__locks[object_id] = (lock, delayed_call)
         logging.info('Lock acquired')
         log.msg('Lock for %s acquired' % object_id, system="Ezekiel")
+        ezekiel_lock_acquired.send(lock)
         return lock
 
     def acquire_lock(self, object_id, locker):
@@ -141,6 +166,7 @@ class EzekielService(Service, BouserPlugin):
 
                 log.msg('lock for %s released' % object_id, system="Ezekiel")
                 logging.info('lock for %s released', object_id)
+                ezekiel_lock_released.send(lock)
                 return LockReleased(lock)
             raise LockNotFound(object_id)
         raise LockNotFound(object_id)

@@ -98,7 +98,9 @@ class EzekielEventSourceResource(Resource, BouserPlugin):
         def onFinish(result):
             if ezl:
                 ezl.stop()
-            log.msg("Connection from %s closed" % request.getClientIP(), system="Ezekiel Event Source")
+            log.msg(
+                u'Connection from %s closed. "%s" hopefully released' % (request.getClientIP(), object_id),
+                system="Ezekiel Event Source")
             if not isinstance(result, failure.Failure):
                 return result
 
@@ -115,13 +117,11 @@ class EzekielEventSourceResource(Resource, BouserPlugin):
             ezl.keep_alive = self.keep_alive
             request.notifyFinish().addBoth(onFinish)
             ezl.start()
-            log.msg("Connection from %s established" % request.getClientIP(), system="Ezekiel Event Source")
+            log.msg(
+                u'Connection from %s established. Locking "%s"' % (request.getClientIP(), object_id),
+                system="Ezekiel Event Source")
 
         defer.returnValue(NOT_DONE_YET)
-
-    @web.on
-    def boot_web(self, web):
-        web.root_resource.putChild('ezekiel-es', self)
 
 
 def make(config):
