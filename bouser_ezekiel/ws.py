@@ -51,6 +51,7 @@ class EzekielWebSocketProtocol(WebSocketServerProtocol):
         self.locks = {}
         self.waiting_locks = set()
         self.user_id = None
+        self.actually_connected = False
 
     def _pinger_func(self):
         self.sendEvent('ping', datetime.datetime.utcnow())
@@ -96,6 +97,7 @@ class EzekielWebSocketProtocol(WebSocketServerProtocol):
 
         def _cb(result):
             self._pinger_lc.start(30, False)
+            self.actually_connected = True
             client_connected.send(self)
             ezekiel_lock_released.connect(self._retry_acquire_after_release)
             self._log('Authenticated')
@@ -113,6 +115,8 @@ class EzekielWebSocketProtocol(WebSocketServerProtocol):
 
     def onClose(self, wasClean, code, reason):
         super(EzekielWebSocketProtocol, self).onClose(wasClean, code, reason)
+        if not self.actually_connected:
+            return
         if self._pinger_lc.running:
             self._pinger_lc.stop()
         ezekiel_lock_released.disconnect(self._retry_acquire_after_release)
@@ -133,13 +137,16 @@ class EzekielWebSocketProtocol(WebSocketServerProtocol):
 
     def _release_all(self):
         self.waiting_locks.clear()
+        locks = self.locks.keys()
+        if not locks:
+            return
         for lock in self.locks.values():
             try:
                 self.factory.ezekiel.release_lock(lock.object_id, lock.token)
             except (LockNotFound, LockAlreadyAcquired) as exc:
                 self.log.error(u'%s' % exc)
         self.locks.clear()
-        self._log(u'Everything released...')
+        self._log(u'Released locks: %s', ', '.join(locks))
 
     def _acquire(self, object_id):
         try:
